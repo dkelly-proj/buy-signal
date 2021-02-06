@@ -90,10 +90,33 @@ def calculate_signal(dataframe):
                                            df_test.iloc[-1]['Close'] > df_test.iloc[-1]['SMA_9'] and
                                            df_test.iloc[-1]['Close'] > df_test.iloc[-1]['Open'])
 
-                    signal.append([symbol, 
+                    signal.append([symbol,
+                                   df_test.iloc[-1]['Date'],
                                    low_candle == True and breakout_candle == True and confirmation_candle == True])
        
             except:
                 next              
 
-    return pd.DataFrame(signal, columns = ['Symbol','Signal'])
+    return pd.DataFrame(signal, columns = ['Symbol','Date','Signal'])
+
+def send_sms(dataframe):
+    df = dataframe
+    global text_log
+    
+    client = boto3.client("sns",
+                          aws_access_key_id = config.python_texter_ak,
+                          aws_secret_access_key = config.python_texter_sk,
+                          region_name = config.python_texter_region)
+    
+    for i in range(0,len(df)):
+        if df['Signal'][i] == True:
+            
+            duplicate = ([df['Symbol'][i], df['Date'][i], df['Signal'][i]] in text_log)
+            
+            if not duplicate:
+                client.publish(PhoneNumber = config.python_texter_phone,
+                               Message = "{} is now set up for a day trade on the 5-minute chart.".format(text_df['Ticker'][i]))
+                
+                text_log.append([df['Symbol'][i], df['Date'][i], df['Signal'][i]])
+                
+    print("Process completed, {} text alerts have been sent - {}".format(len(text_log), datetime.datetime.now()))
