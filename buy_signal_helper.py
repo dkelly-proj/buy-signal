@@ -9,7 +9,7 @@ from td.client import TDClient
 import config
 
 # retrieve symbols from Radar watchlist
-def get_symbols():
+def get_symbols(watchlist):
     TDSession = TDClient(
         client_id=config.client_id,
         redirect_uri='http://localhost/test',
@@ -22,7 +22,7 @@ def get_symbols():
     i = 0
 
     for r in response:
-        if r['name'] == 'Radar':
+        if r['name'] == str(watchlist):
             watch = response[i]
             symbols = [watch['watchlistItems'][x]['instrument']['symbol'] for x in range(len(watch['watchlistItems']))]
         else:
@@ -31,7 +31,7 @@ def get_symbols():
     return symbols
 
 # Get prices for Radar charts
-def get_signal_prices(candle_minutes, symbols):
+def dt_signal_prices(candle_minutes, symbols):
     TDSession = TDClient(
         client_id=config.client_id,
         redirect_uri='http://localhost/test',
@@ -43,12 +43,7 @@ def get_signal_prices(candle_minutes, symbols):
     price_end_date = str(int(round(cur_day.timestamp() * 1000)))
     price_start_date = str(int(round(datetime.datetime(cur_day.year, cur_day.month, cur_day.day-1).timestamp() * 1000)))
 
-    sym = []
-    da = []
-    op = []
-    cl = []
-    hi = []
-    lo = []
+    candle_list = []
 
     for symbol in symbols:
         p_hist = TDSession.get_price_history(symbol,
@@ -59,20 +54,19 @@ def get_signal_prices(candle_minutes, symbols):
                                              start_date=price_start_date)
 
         for candle in p_hist['candles']:
-            sym.append(symbol)
-            da.append(datetime.datetime.fromtimestamp(candle['datetime'] / 1000))
-            op.append(candle['open'])
-            cl.append(candle['close'])
-            hi.append(candle['high'])
-            lo.append(candle['low'])
+            candle_list.append([symbol,
+                                datetime.datetime.fromtimestamp(candle['datetime'] / 1000),
+                                candle['open'],
+                                candle['close'],
+                                candle['high'],
+                                candle['low']])
 
-    df_p_hist = pd.DataFrame({'Symbol': sym, 'Date': da, 'Open': op,
-                              'Close': cl, 'High': hi, 'Low': lo})
+    df_dt = pd.DataFrame(candle_list, columns = ['Symbol', 'Date', 'Open', 'Close', 'High', 'Low'])
 
     # Calculate moving average
-    df_p_hist['SMA_9'] = df_p_hist.groupby('Symbol')['Close'].rolling(9).mean().reset_index(0,drop=True)
+    df_dt['SMA_9'] = df_dt.groupby('Symbol')['Close'].rolling(9).mean().reset_index(0,drop=True)
 
-    return df_p_hist
+    return df_dt
 
 def send_sms_alert(dataframe):
     df = dataframe
