@@ -9,7 +9,7 @@ from td.client import TDClient
 import config
 
 # retrieve symbols from Radar watchlist
-def get_symbols():
+def get_symbols(watchlist):
     TDSession = TDClient(
         client_id=config.client_id,
         redirect_uri='http://localhost/test',
@@ -22,7 +22,7 @@ def get_symbols():
     i = 0
 
     for r in response:
-        if r['name'] == 'Radar':
+        if r['name'] == str(watchlist):
             watch = response[i]
             symbols = [watch['watchlistItems'][x]['instrument']['symbol'] for x in range(len(watch['watchlistItems']))]
         else:
@@ -31,7 +31,7 @@ def get_symbols():
     return symbols
 
 # Get prices for Radar charts
-def get_signal_prices(candle_minutes, symbols):
+def dt_signal_prices(candle_minutes, symbols):
     TDSession = TDClient(
         client_id=config.client_id,
         redirect_uri='http://localhost/test',
@@ -43,12 +43,7 @@ def get_signal_prices(candle_minutes, symbols):
     price_end_date = str(int(round(cur_day.timestamp() * 1000)))
     price_start_date = str(int(round(datetime.datetime(cur_day.year, cur_day.month, cur_day.day-1).timestamp() * 1000)))
 
-    sym = []
-    da = []
-    op = []
-    cl = []
-    hi = []
-    lo = []
+    candle_list = []
 
     for symbol in symbols:
         p_hist = TDSession.get_price_history(symbol,
@@ -59,55 +54,46 @@ def get_signal_prices(candle_minutes, symbols):
                                              start_date=price_start_date)
 
         for candle in p_hist['candles']:
-            sym.append(symbol)
-            da.append(datetime.datetime.fromtimestamp(candle['datetime'] / 1000))
-            op.append(candle['open'])
-            cl.append(candle['close'])
-            hi.append(candle['high'])
-            lo.append(candle['low'])
+            candle_list.append([symbol,
+                                datetime.datetime.fromtimestamp(candle['datetime'] / 1000),
+                                candle['open'],
+                                candle['close'],
+                                candle['high'],
+                                candle['low']])
 
-    df_p_hist = pd.DataFrame({'Symbol': sym, 'Date': da, 'Open': op,
-                              'Close': cl, 'High': hi, 'Low': lo})
+    df_dt = pd.DataFrame(candle_list, columns = ['Symbol', 'Date', 'Open', 'Close', 'High', 'Low'])
 
     # Calculate moving average
-    df_p_hist['SMA_9'] = df_p_hist.groupby('Symbol')['Close'].rolling(9).mean().reset_index(0,drop=True)
+    df_dt['SMA_9'] = df_dt.groupby('Symbol')['Close'].rolling(9).mean().reset_index(0,drop=True)
 
-    return df_p_hist
+    return df_dt
 
-def send_sms_alert(dataframe):
+def calculate_signal(dataframe):
     df = dataframe
-    df_max = df[df['Date'].isin(pd.Series(df['Date'].unique()).nlargest(2))].reset_index(drop=True)
+    df_max = df[df['Date'].isin(pd.Series(df['Date'].unique()).nlargest(3))].reset_index(drop=True)
 
-    results = []
+    signal = []
 
     for symbol in df_max['Symbol'].unique():
-        df_one = df_max[df_max['Symbol'] == symbol]
+        df_test = df_max[df_max['Symbol'] == symbol].reset_index(drop = True)
+        
+        if len(df_test) == 3:
+            try:
+                for i in range(2, len(df_test)):
+                    low_candle = (df_test.iloc[-3]['Open'] < df_test.iloc[-3]['SMA_9'] and
+                                  df_test.iloc[-3]['Close'] < df_test.iloc[-3]['SMA_9'])
 
-        try:
-            if ((df_one.iloc[-2]['Open'] < df_one.iloc[-2]['SMA_9']) and
-                    (df_one.iloc[-2]['Close'] < df_one.iloc[-2]['SMA_9']) and
-                    (df_one.iloc[-1]['Open'] < df_one.iloc[-1]['SMA_9']) and
-                    (df_one.iloc[-1]['Close'] > df_one.iloc[-1]['SMA_9'])):
-                results.append([symbol, True])
+                    breakout_candle = (df_test.iloc[-2]['Open'] < df_test.iloc[-2]['SMA_9'] and
+                                       df_test.iloc[-2]['Close'] > df_test.iloc[-2]['SMA_9'])
 
-            else:
-                results.append([symbol, False])
+                    confirmation_candle = (df_test.iloc[-1]['Open'] > df_test.iloc[-1]['SMA_9'] and
+                                           df_test.iloc[-1]['Close'] > df_test.iloc[-1]['SMA_9'] and
+                                           df_test.iloc[-1]['Close'] > df_test.iloc[-1]['Open'])
 
-        except:
-            next
+                    signal.append([symbol, 
+                                   low_candle == True and breakout_candle == True and confirmation_candle == True])
+       
+            except:
+                next              
 
-    text_df = pd.DataFrame(results, columns=['Ticker', 'Text'])
-
-    client = boto3.client(
-        "sns",
-        aws_access_key_id = config.python_texter_ak,
-        aws_secret_access_key = config.python_texter_sk,
-        region_name = config.python_texter_region
-    )
-
-    for i in range(0,len(text_df)):
-        if text_df['Text'][i] == True:
-            client.publish(PhoneNumber = config.python_texter_phone,
-                           Message = "{} is now set up for a day trade on the 5-minute chart.".format(text_df['Ticker'][i]))
-
-    print("Process completed - {}".format(datetime.datetime.now()))
+    return pd.DataFrame(signal, columns = ['Symbol','Signal'])
