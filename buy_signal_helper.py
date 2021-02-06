@@ -76,12 +76,12 @@ def get_signal_prices(candle_minutes, symbols):
 
 def send_sms_alert(dataframe):
     df = dataframe
-    df_max = df[df['Date'].isin(pd.Series(df['Date'].unique()).nlargest(2))].reset_index(drop=True)
+    df_max = df[df['Date'].isin(pd.Series(df['Date'].unique()).nlargest(3))].reset_index(drop=True)
 
     results = []
 
     for symbol in df_max['Symbol'].unique():
-        df_one = df_max[df_max['Symbol'] == symbol]
+        df_one = df_max[df_max['Symbol'] == symbol].reset_index(drop = True)
 
         try:
             if ((df_one.iloc[-2]['Open'] < df_one.iloc[-2]['SMA_9']) and
