@@ -16,7 +16,7 @@ starttime = time.time()
 # Establish log for alerts
 text_log = []
 
-# Execute setup screen every two minutes
+# Enter infinite loop
 while True:
 
     # Check that market is open
@@ -34,4 +34,5 @@ while True:
         # Send alerts
         buy_signal_helper.send_sms(df)
 
+    # Execute every two minutes
     time.sleep(120.0 - ((time.time() - starttime) % 120.0))
