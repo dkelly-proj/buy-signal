@@ -99,9 +99,8 @@ def calculate_signal(dataframe):
 
     return pd.DataFrame(signal, columns = ['Symbol','Date','Signal'])
 
-def send_sms(dataframe):
+def send_sms(dataframe, text_log):
     df = dataframe
-    global text_log
     
     client = boto3.client("sns",
                           aws_access_key_id = config.python_texter_ak,
@@ -120,3 +119,4 @@ def send_sms(dataframe):
                 text_log.append([df['Symbol'][i], df['Date'][i], df['Signal'][i]])
                 
     print("Process completed, {} text alerts have been sent - {}".format(len(text_log), datetime.datetime.now()))
+    return text_log
