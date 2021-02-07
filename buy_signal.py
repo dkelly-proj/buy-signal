@@ -5,19 +5,55 @@ import pandas as pd
 import pytz
 from td.client import TDClient
 import time
+import sys
 
 # Local imports
 import config
 import buy_signal_helper
 
 # Set start time
-starttime = time.time()
+#starttime = time.time()
 
-# Execute setup screen every two minutes
+# Establish log for alerts
+text_log = []
+
+# Enter infinite loop
 while True:
 
-    if datetime.datetime.now() in [9,10,11,12,13,14,15,16]:
-        df = buy_signal_helper.get_signal_prices(5, buy_signal_helper.get_symbols())
-        buy_signal_helper.send_sms_alert(df)
+    # Loop until shutdown
+    try:
 
-    time.sleep(120.0 - ((time.time() - starttime) % 120.0))
+        # Check that market is open
+        if datetime.datetime.now().hour in [9,10,11,12,13,14,15,16]:
+            
+            # Get symbols from watchlist
+            watchlist = buy_signal_helper.get_symbols('Radar')
+
+            # Get price history for watchlist symbols
+            df = buy_signal_helper.dt_signal_prices(5, watchlist)
+
+            # Calculate signals
+            df = buy_signal_helper.calculate_signal(df)
+
+            # Send alerts
+            text_log = buy_signal_helper.send_sms(df, text_log)
+
+        else:
+            print('Market currently closed - {}'.format(datetime.datetime.now()))
+
+        # Execute every two minutes
+        time.sleep(10)
+
+    # When shutdown, print text log
+    except KeyboardInterrupt:
+
+        # Print log of alerts
+        if len(text_log) < 1:
+            print("No text alerts were sent.")
+
+        else:
+            print(pd.DataFrame(text_log, columns = ['Symbol','Date','Signal']))
+
+        # Exit script
+        print("Exiting...")
+        sys.exit()
