@@ -42,7 +42,7 @@ while True:
             print('Market currently closed - {}'.format(datetime.datetime.now()))
 
         # Execute every two minutes
-        time.sleep(10)
+        time.sleep(120)
 
     # When shutdown, print text log
     except KeyboardInterrupt:
