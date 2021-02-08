@@ -114,7 +114,7 @@ def send_sms(dataframe, text_log):
             
             if not duplicate:
                 client.publish(PhoneNumber = config.python_texter_phone,
-                               Message = "{} is now set up for a day trade on the 5-minute chart.".format(text_df['Ticker'][i]))
+                               Message = "{} is now set up for a day trade on the 5-minute chart.".format(df['Symbol'][i]))
                 
                 text_log.append([df['Symbol'][i], df['Date'][i], df['Signal'][i]])
                 
