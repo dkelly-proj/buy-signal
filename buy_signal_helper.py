@@ -84,7 +84,9 @@ def calculate_signal(dataframe):
                                   df_test.iloc[-3]['Close'] < df_test.iloc[-3]['SMA_9'])
 
                     breakout_candle = (df_test.iloc[-2]['Open'] < df_test.iloc[-2]['SMA_9'] and
-                                       df_test.iloc[-2]['Close'] > df_test.iloc[-2]['SMA_9'])
+                                       df_test.iloc[-2]['Close'] > df_test.iloc[-2]['SMA_9'] and
+                                       # Breakout greater than 1%
+                                       (df_test.iloc[-2]['Close'] - df_test.iloc[-2]['Open'])/df_test.iloc[-2]['Open']*100 > 1)
 
                     confirmation_candle = (df_test.iloc[-1]['Open'] > df_test.iloc[-1]['SMA_9'] and
                                            df_test.iloc[-1]['Close'] > df_test.iloc[-1]['SMA_9'] and
